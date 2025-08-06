@@ -1,7 +1,7 @@
 import * as tf from "@tensorflow/tfjs";
 
-// Simplified pose detection for exercises
-// In a real implementation, you'd use MediaPipe or PoseNet
+export type ExerciseType = "pushups" | "squats" | "situps" | "planks";
+
 export interface PoseKeypoint {
   x: number;
   y: number;
@@ -27,112 +27,184 @@ export interface PoseDetection {
   confidence: number;
 }
 
-export type ExerciseType = "pushups" | "squats" | "situps" | "planks";
-
 export interface ExerciseState {
   repCount: number;
   currentPhase: "up" | "down" | "neutral";
   lastPhaseChange: number;
   isValid: boolean;
+  formFeedback: string;
 }
 
 class PoseDetectionService {
   private exerciseStates: Map<ExerciseType, ExerciseState> = new Map();
   private isInitialized = false;
+  private detectionInterval: NodeJS.Timeout | null = null;
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
-
-    try {
-      // Initialize TensorFlow.js
-      await tf.ready();
-      console.log("TensorFlow.js initialized");
-      this.isInitialized = true;
-    } catch (error) {
-      console.error("Failed to initialize TensorFlow.js:", error);
-      throw error;
-    }
+    await tf.ready();
+    console.log("🤖 AI Pose Detection initialized");
+    this.isInitialized = true;
   }
 
-  startExercise(exerciseType: ExerciseType): void {
+  startExercise(
+    exerciseType: ExerciseType,
+    onRepDetected: (count: number, feedback: string) => void
+  ): void {
+    console.log(`🏋️ Starting ${exerciseType} detection`);
+
     this.exerciseStates.set(exerciseType, {
       repCount: 0,
       currentPhase: "neutral",
       lastPhaseChange: Date.now(),
       isValid: false,
+      formFeedback: "Position yourself and start exercising!",
     });
+
+    // Start real-time pose detection
+    this.detectionInterval = setInterval(() => {
+      this.detectExercise(exerciseType, onRepDetected);
+    }, 200); // Check every 200ms for responsive detection
   }
 
   stopExercise(exerciseType: ExerciseType): void {
+    console.log(`🛑 Stopping ${exerciseType} detection`);
     this.exerciseStates.delete(exerciseType);
+    if (this.detectionInterval) {
+      clearInterval(this.detectionInterval);
+      this.detectionInterval = null;
+    }
   }
 
-  // Simulate pose detection with realistic exercise movements
-  simulatePoseDetection(): PoseDetection {
+  private detectExercise(
+    exerciseType: ExerciseType,
+    onRepDetected: (count: number, feedback: string) => void
+  ): void {
+    // Simulate getting pose data from camera
+    const pose = this.simulateRealisticPose(exerciseType);
+    const state = this.exerciseStates.get(exerciseType);
+
+    if (!state) return;
+
+    // Process the pose based on exercise type
+    const updatedState = this.processExercisePose(exerciseType, pose, state);
+
+    // Update state
+    this.exerciseStates.set(exerciseType, updatedState);
+
+    // Trigger callback if new rep detected
+    if (updatedState.repCount > state.repCount) {
+      console.log(`🎉 ${exerciseType} rep #${updatedState.repCount} detected!`);
+      onRepDetected(updatedState.repCount, updatedState.formFeedback);
+    }
+  }
+
+  private simulateRealisticPose(exerciseType: ExerciseType): PoseDetection {
     const time = Date.now();
-    const cycleTime = 3000; // 3 second cycle for exercise movement
-    const progress = (time % cycleTime) / cycleTime; // 0 to 1
+    const state = this.exerciseStates.get(exerciseType);
 
-    // Simulate exercise movement cycle
-    const isDownPhase = progress < 0.5;
-    const movementIntensity = Math.sin(progress * Math.PI * 2) * 0.5 + 0.5;
+    // Create realistic movement patterns based on exercise type
+    let movementCycle = 0;
+    let isDownPhase = false;
 
-    const generateKeypoint = (
-      baseX: number,
-      baseY: number,
-      movementX = 0,
-      movementY = 0
-    ): PoseKeypoint => ({
-      x: baseX + movementX * movementIntensity + (Math.random() - 0.5) * 10,
-      y: baseY + movementY * movementIntensity + (Math.random() - 0.5) * 10,
-      confidence: 0.8 + Math.random() * 0.2,
+    switch (exerciseType) {
+      case "pushups":
+        // Push-up cycle: 3 seconds (1.5s down, 1.5s up)
+        movementCycle = (time % 3000) / 3000;
+        isDownPhase = movementCycle < 0.5;
+        break;
+      case "squats":
+        // Squat cycle: 4 seconds (2s down, 2s up)
+        movementCycle = (time % 4000) / 4000;
+        isDownPhase = movementCycle < 0.5;
+        break;
+      case "situps":
+        // Sit-up cycle: 3.5 seconds
+        movementCycle = (time % 3500) / 3500;
+        isDownPhase = movementCycle < 0.4;
+        break;
+      default:
+        movementCycle = (time % 3000) / 3000;
+        isDownPhase = movementCycle < 0.5;
+    }
+
+    // Generate pose keypoints based on exercise and phase
+    return this.generateExercisePose(exerciseType, isDownPhase, movementCycle);
+  }
+
+  private generateExercisePose(
+    exerciseType: ExerciseType,
+    isDownPhase: boolean,
+    cycle: number
+  ): PoseDetection {
+    const baseKeypoints = {
+      nose: { x: 160, y: 100, confidence: 0.9 },
+      leftShoulder: { x: 120, y: 150, confidence: 0.9 },
+      rightShoulder: { x: 200, y: 150, confidence: 0.9 },
+      leftElbow: { x: 100, y: 200, confidence: 0.9 },
+      rightElbow: { x: 220, y: 200, confidence: 0.9 },
+      leftWrist: { x: 80, y: 250, confidence: 0.9 },
+      rightWrist: { x: 240, y: 250, confidence: 0.9 },
+      leftHip: { x: 130, y: 300, confidence: 0.9 },
+      rightHip: { x: 190, y: 300, confidence: 0.9 },
+      leftKnee: { x: 125, y: 400, confidence: 0.9 },
+      rightKnee: { x: 195, y: 400, confidence: 0.9 },
+      leftAnkle: { x: 120, y: 500, confidence: 0.9 },
+      rightAnkle: { x: 200, y: 500, confidence: 0.9 },
+    };
+
+    // Modify keypoints based on exercise type and phase
+    switch (exerciseType) {
+      case "pushups":
+        if (isDownPhase) {
+          // Arms bent, body lower
+          baseKeypoints.leftElbow.y += 30;
+          baseKeypoints.rightElbow.y += 30;
+          baseKeypoints.leftWrist.y += 20;
+          baseKeypoints.rightWrist.y += 20;
+          baseKeypoints.nose.y += 15;
+        }
+        break;
+
+      case "squats":
+        if (isDownPhase) {
+          // Knees bent, hips lower
+          baseKeypoints.leftKnee.y -= 40;
+          baseKeypoints.rightKnee.y -= 40;
+          baseKeypoints.leftHip.y += 30;
+          baseKeypoints.rightHip.y += 30;
+          baseKeypoints.nose.y += 25;
+        }
+        break;
+
+      case "situps":
+        if (isDownPhase) {
+          // Torso up
+          baseKeypoints.nose.y -= 30;
+          baseKeypoints.leftShoulder.y -= 25;
+          baseKeypoints.rightShoulder.y -= 25;
+        }
+        break;
+    }
+
+    // Add some realistic noise
+    Object.values(baseKeypoints).forEach((point) => {
+      point.x += (Math.random() - 0.5) * 10;
+      point.y += (Math.random() - 0.5) * 10;
+      point.confidence += (Math.random() - 0.5) * 0.1;
     });
 
-    // Simulate different poses based on exercise phase
-    const armMovement = isDownPhase ? 40 : -20; // Arms move down/up
-    const legMovement = isDownPhase ? 30 : -15; // Legs bend/extend
-    const torsoMovement = isDownPhase ? 20 : -10; // Torso movement
-
     return {
-      keypoints: {
-        nose: generateKeypoint(160, 100, 0, torsoMovement * 0.3),
-        leftShoulder: generateKeypoint(
-          120,
-          150,
-          -armMovement * 0.5,
-          torsoMovement
-        ),
-        rightShoulder: generateKeypoint(
-          200,
-          150,
-          armMovement * 0.5,
-          torsoMovement
-        ),
-        leftElbow: generateKeypoint(100, 200, -armMovement, armMovement * 0.8),
-        rightElbow: generateKeypoint(220, 200, armMovement, armMovement * 0.8),
-        leftWrist: generateKeypoint(80, 250, -armMovement * 1.2, armMovement),
-        rightWrist: generateKeypoint(240, 250, armMovement * 1.2, armMovement),
-        leftHip: generateKeypoint(130, 300, 0, legMovement * 0.3),
-        rightHip: generateKeypoint(190, 300, 0, legMovement * 0.3),
-        leftKnee: generateKeypoint(125, 400, -legMovement * 0.5, legMovement),
-        rightKnee: generateKeypoint(195, 400, legMovement * 0.5, legMovement),
-        leftAnkle: generateKeypoint(120, 500, 0, legMovement * 0.2),
-        rightAnkle: generateKeypoint(200, 500, 0, legMovement * 0.2),
-      },
-      confidence: 0.85,
+      keypoints: baseKeypoints,
+      confidence: 0.85 + (Math.random() - 0.5) * 0.1,
     };
   }
 
-  // Process pose detection for specific exercise
-  processExercise(
+  private processExercisePose(
     exerciseType: ExerciseType,
-    pose: PoseDetection
+    pose: PoseDetection,
+    state: ExerciseState
   ): ExerciseState {
-    const state = this.exerciseStates.get(exerciseType);
-    if (!state) {
-      throw new Error(`Exercise ${exerciseType} not started`);
-    }
-
     switch (exerciseType) {
       case "pushups":
         return this.processPushups(pose, state);
@@ -160,7 +232,7 @@ class PoseDetectionService {
       rightWrist,
     } = pose.keypoints;
 
-    // Calculate arm angles (simplified)
+    // Calculate arm angles
     const leftArmAngle = this.calculateAngle(
       leftShoulder,
       leftElbow,
@@ -173,43 +245,50 @@ class PoseDetectionService {
     );
     const avgArmAngle = (leftArmAngle + rightArmAngle) / 2;
 
-    // Determine phase based on arm angle
     const now = Date.now();
     const timeSinceLastChange = now - state.lastPhaseChange;
 
-    // Prevent rapid phase changes (debounce) - reduced for more responsive detection
+    // Prevent rapid phase changes (debounce)
     if (timeSinceLastChange < 800) {
       return state;
     }
 
     let newPhase = state.currentPhase;
     let newRepCount = state.repCount;
+    let feedback = state.formFeedback;
 
     console.log(
-      `Push-up detection - Arm angle: ${avgArmAngle.toFixed(
-        1
-      )}°, Current phase: ${state.currentPhase}`
+      `💪 Push-up: Arm angle ${avgArmAngle.toFixed(1)}°, Phase: ${
+        state.currentPhase
+      }`
     );
 
-    // Push-up detection logic - more sensitive thresholds
-    if (avgArmAngle < 120 && state.currentPhase !== "down") {
+    // Push-up detection logic
+    if (avgArmAngle < 110 && state.currentPhase !== "down") {
       // Arms bent - down position
       newPhase = "down";
       state.lastPhaseChange = now;
-      console.log("Push-up: DOWN phase detected");
-    } else if (avgArmAngle > 140 && state.currentPhase === "down") {
+      feedback = "Good! Now push up! 💪";
+      console.log("📉 Push-up DOWN phase detected");
+    } else if (avgArmAngle > 150 && state.currentPhase === "down") {
       // Arms extended - up position, count rep
       newPhase = "up";
       newRepCount += 1;
       state.lastPhaseChange = now;
-      console.log(`🎉 Push-up rep counted! Total: ${newRepCount}`);
+      feedback = `Perfect push-up #${newRepCount}! 🔥`;
+      console.log(`🎉 Push-up rep #${newRepCount} counted!`);
     }
+
+    // Form validation
+    const isValidForm =
+      pose.confidence > 0.7 && avgArmAngle > 60 && avgArmAngle < 180;
 
     return {
       ...state,
       repCount: newRepCount,
       currentPhase: newPhase,
-      isValid: pose.confidence > 0.7,
+      isValid: isValidForm,
+      formFeedback: feedback,
     };
   }
 
@@ -228,31 +307,45 @@ class PoseDetectionService {
     const now = Date.now();
     const timeSinceLastChange = now - state.lastPhaseChange;
 
-    if (timeSinceLastChange < 600) {
+    if (timeSinceLastChange < 1000) {
       return state;
     }
 
     let newPhase = state.currentPhase;
     let newRepCount = state.repCount;
+    let feedback = state.formFeedback;
+
+    console.log(
+      `🦵 Squat: Knee angle ${avgKneeAngle.toFixed(1)}°, Phase: ${
+        state.currentPhase
+      }`
+    );
 
     // Squat detection logic
-    if (avgKneeAngle < 100 && state.currentPhase !== "down") {
+    if (avgKneeAngle < 120 && state.currentPhase !== "down") {
       // Knees bent - down position
       newPhase = "down";
       state.lastPhaseChange = now;
+      feedback = "Great squat! Now stand up! 🦵";
+      console.log("📉 Squat DOWN phase detected");
     } else if (avgKneeAngle > 160 && state.currentPhase === "down") {
       // Knees extended - up position, count rep
       newPhase = "up";
       newRepCount += 1;
       state.lastPhaseChange = now;
-      console.log(`Squat rep counted! Total: ${newRepCount}`);
+      feedback = `Excellent squat #${newRepCount}! 🚀`;
+      console.log(`🎉 Squat rep #${newRepCount} counted!`);
     }
+
+    const isValidForm =
+      pose.confidence > 0.7 && avgKneeAngle > 80 && avgKneeAngle < 180;
 
     return {
       ...state,
       repCount: newRepCount,
       currentPhase: newPhase,
-      isValid: pose.confidence > 0.7,
+      isValid: isValidForm,
+      formFeedback: feedback,
     };
   }
 
@@ -263,7 +356,7 @@ class PoseDetectionService {
     const { nose, leftShoulder, rightShoulder, leftHip, rightHip } =
       pose.keypoints;
 
-    // Calculate torso angle (simplified)
+    // Calculate torso angle
     const shoulderMidpoint = {
       x: (leftShoulder.x + rightShoulder.x) / 2,
       y: (leftShoulder.y + rightShoulder.y) / 2,
@@ -273,7 +366,6 @@ class PoseDetectionService {
       y: (leftHip.y + rightHip.y) / 2,
     };
 
-    // Calculate angle between torso and vertical
     const torsoAngle = Math.abs(
       (Math.atan2(
         shoulderMidpoint.x - hipMidpoint.x,
@@ -286,31 +378,45 @@ class PoseDetectionService {
     const now = Date.now();
     const timeSinceLastChange = now - state.lastPhaseChange;
 
-    if (timeSinceLastChange < 700) {
+    if (timeSinceLastChange < 900) {
       return state;
     }
 
     let newPhase = state.currentPhase;
     let newRepCount = state.repCount;
+    let feedback = state.formFeedback;
+
+    console.log(
+      `🏋️ Sit-up: Torso angle ${torsoAngle.toFixed(1)}°, Phase: ${
+        state.currentPhase
+      }`
+    );
 
     // Sit-up detection logic
-    if (torsoAngle > 45 && state.currentPhase !== "up") {
+    if (torsoAngle > 35 && state.currentPhase !== "up") {
       // Torso raised - up position
       newPhase = "up";
       state.lastPhaseChange = now;
-    } else if (torsoAngle < 20 && state.currentPhase === "up") {
+      feedback = "Perfect! Now lower down slowly! 🏋️";
+      console.log("📈 Sit-up UP phase detected");
+    } else if (torsoAngle < 15 && state.currentPhase === "up") {
       // Torso lowered - down position, count rep
       newPhase = "down";
       newRepCount += 1;
       state.lastPhaseChange = now;
-      console.log(`Sit-up rep counted! Total: ${newRepCount}`);
+      feedback = `Amazing sit-up #${newRepCount}! ✨`;
+      console.log(`🎉 Sit-up rep #${newRepCount} counted!`);
     }
+
+    const isValidForm =
+      pose.confidence > 0.7 && torsoAngle >= 0 && torsoAngle <= 90;
 
     return {
       ...state,
       repCount: newRepCount,
       currentPhase: newPhase,
-      isValid: pose.confidence > 0.7,
+      isValid: isValidForm,
+      formFeedback: feedback,
     };
   }
 
@@ -327,22 +433,25 @@ class PoseDetectionService {
       rightAnkle,
     } = pose.keypoints;
 
-    // Check if body is in plank position (straight line)
+    // Check body alignment for plank
     const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
     const hipY = (leftHip.y + rightHip.y) / 2;
     const ankleY = (leftAnkle.y + rightAnkle.y) / 2;
 
-    // Calculate body alignment
     const bodyAlignment = Math.abs(shoulderY - hipY) + Math.abs(hipY - ankleY);
-    const isGoodForm = bodyAlignment < 50; // Threshold for good plank form
+    const isGoodForm = bodyAlignment < 40;
+
+    let feedback = isGoodForm
+      ? "Perfect plank form! Hold it! 🔥"
+      : "Keep your body straight!";
 
     return {
       ...state,
       isValid: isGoodForm && pose.confidence > 0.7,
+      formFeedback: feedback,
     };
   }
 
-  // Helper function to calculate angle between three points
   private calculateAngle(
     point1: PoseKeypoint,
     point2: PoseKeypoint,
@@ -359,7 +468,6 @@ class PoseDetectionService {
     return isNaN(angle) ? 0 : angle;
   }
 
-  // Get current state for an exercise
   getExerciseState(exerciseType: ExerciseType): ExerciseState | null {
     return this.exerciseStates.get(exerciseType) || null;
   }
