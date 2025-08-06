@@ -31,9 +31,10 @@ interface DashboardProps {
     situps: number;
     planks: number;
   };
+  onStartExercise?: (exerciseType: 'pushups' | 'squats' | 'situps' | 'planks', target: number) => void;
 }
 
-const DashboardScreen: React.FC<DashboardProps> = () => {
+const DashboardScreen: React.FC<DashboardProps> = ({ onStartExercise }) => {
   const dispatch = useAppDispatch();
   const { 
     currentDay, 
@@ -41,7 +42,13 @@ const DashboardScreen: React.FC<DashboardProps> = () => {
     baselines, 
     dailyProgress,
     isActive 
-  } = useAppSelector((state) => state.challenge);
+  } = useAppSelector((state) => state.challenge || {
+    currentDay: 1,
+    currentStreak: 0,
+    baselines: { pushups: 10, squats: 15, situps: 10, planks: 30 },
+    dailyProgress: {},
+    isActive: false
+  });
   
   const [exercises, setExercises] = useState<ExerciseTarget[]>([]);
   const [timeRemaining, setTimeRemaining] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -152,15 +159,21 @@ const DashboardScreen: React.FC<DashboardProps> = () => {
 
   const handleStartExercise = (exerciseType: string) => {
     console.log(`Starting ${exerciseType} exercise`);
+    console.log('onStartExercise prop:', onStartExercise);
     
-    // For now, simulate completing the exercise with target reps
-    // In a real app, this would navigate to the exercise tracking screen
     const exercise = exercises.find(ex => ex.type === exerciseType);
-    if (exercise && !exercise.completed) {
-      dispatch(completeExercise({
-        exerciseType: exerciseType as keyof typeof baselines,
-        actualCount: exercise.target,
-      }));
+    console.log('Found exercise:', exercise);
+    
+    if (exercise && !exercise.completed && onStartExercise) {
+      console.log('Navigating to exercise screen...');
+      // Navigate to exercise tracking screen
+      onStartExercise(exerciseType as 'pushups' | 'squats' | 'situps' | 'planks', exercise.target);
+    } else {
+      console.log('Cannot start exercise:', {
+        hasExercise: !!exercise,
+        isCompleted: exercise?.completed,
+        hasCallback: !!onStartExercise
+      });
     }
   };
 
@@ -280,7 +293,7 @@ const DashboardScreen: React.FC<DashboardProps> = () => {
                     </Text>
                     <View style={styles.progressIndicator}>
                       <View style={[styles.progressDot, exercise.completed && styles.progressDotCompleted]} />
-                      <Text style={styles.progressText}>
+                      <Text style={styles.progressTextSmall}>
                         {exercise.completed ? 'Completed ✅' : 'Pending'}
                       </Text>
                     </View>
@@ -539,7 +552,7 @@ const styles = StyleSheet.create({
   progressDotCompleted: {
     backgroundColor: '#4CAF50',
   },
-  progressText: {
+  progressTextSmall: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '600',
