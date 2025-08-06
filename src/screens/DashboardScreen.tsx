@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,14 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  Animated,
+  Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { completeExercise } from '../store/slices/challengeSlice';
+
+const { width, height } = Dimensions.get('window');
 
 interface ExerciseTarget {
   type: 'pushups' | 'squats' | 'situps' | 'planks';
@@ -26,216 +33,571 @@ interface DashboardProps {
   };
 }
 
-const DashboardScreen: React.FC<DashboardProps> = ({ 
-  baselines = { pushups: 10, squats: 15, situps: 10, planks: 30 } 
-}) => {
-  const [currentDay, setCurrentDay] = useState(27); // Example day
-  const [currentStreak, setCurrentStreak] = useState(27);
+const DashboardScreen: React.FC<DashboardProps> = () => {
+  const dispatch = useAppDispatch();
+  const { 
+    currentDay, 
+    currentStreak, 
+    baselines, 
+    dailyProgress,
+    isActive 
+  } = useAppSelector((state) => state.challenge);
+  
   const [exercises, setExercises] = useState<ExerciseTarget[]>([]);
+  const [timeRemaining, setTimeRemaining] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  
+  // Animation refs
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const timerPulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Calculate today's targets based on baselines and current day
-    const todaysExercises: ExerciseTarget[] = [
-      {
-        type: 'pushups',
-        name: 'Push-ups',
-        emoji: '💪',
-        target: baselines.pushups + (currentDay - 1),
-        unit: 'reps',
-        completed: false,
-      },
-      {
-        type: 'squats',
-        name: 'Squats',
-        emoji: '🦵',
-        target: baselines.squats + (currentDay - 1),
-        unit: 'reps',
-        completed: false,
-      },
-      {
-        type: 'situps',
-        name: 'Sit-ups',
-        emoji: '🏋️',
-        target: baselines.situps + (currentDay - 1),
-        unit: 'reps',
-        completed: false,
-      },
-      {
-        type: 'planks',
-        name: 'Planks',
-        emoji: '⏱️',
-        target: baselines.planks + (currentDay - 1) * 5, // +5 seconds per day
-        unit: 'seconds',
-        completed: false,
-      },
-    ];
-    setExercises(todaysExercises);
-  }, [currentDay, baselines]);
+    if (!isActive) return;
+    
+    // Get today's progress from Redux state
+    const today = new Date().toISOString().split('T')[0];
+    const todayProgress = dailyProgress[today];
+    
+    if (todayProgress) {
+      const todaysExercises: ExerciseTarget[] = [
+        {
+          type: 'pushups',
+          name: 'Push-ups',
+          emoji: '💪',
+          target: todayProgress.exercises.pushups.target,
+          unit: 'reps',
+          completed: todayProgress.exercises.pushups.completed,
+        },
+        {
+          type: 'squats',
+          name: 'Squats',
+          emoji: '🦵',
+          target: todayProgress.exercises.squats.target,
+          unit: 'reps',
+          completed: todayProgress.exercises.squats.completed,
+        },
+        {
+          type: 'situps',
+          name: 'Sit-ups',
+          emoji: '🏋️',
+          target: todayProgress.exercises.situps.target,
+          unit: 'reps',
+          completed: todayProgress.exercises.situps.completed,
+        },
+        {
+          type: 'planks',
+          name: 'Planks',
+          emoji: '⏱️',
+          target: todayProgress.exercises.planks.target,
+          unit: 'seconds',
+          completed: todayProgress.exercises.planks.completed,
+        },
+      ];
+      setExercises(todaysExercises);
+    }
+
+    // Start entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Pulse animation for timer
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(timerPulse, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(timerPulse, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [currentDay, baselines, dailyProgress, isActive]);
+
+  // 24-hour countdown timer
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const diff = tomorrow.getTime() - now.getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      setTimeRemaining({ hours, minutes, seconds });
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const handleStartExercise = (exerciseType: string) => {
     console.log(`Starting ${exerciseType} exercise`);
+    
+    // For now, simulate completing the exercise with target reps
+    // In a real app, this would navigate to the exercise tracking screen
+    const exercise = exercises.find(ex => ex.type === exerciseType);
+    if (exercise && !exercise.completed) {
+      dispatch(completeExercise({
+        exerciseType: exerciseType as keyof typeof baselines,
+        actualCount: exercise.target,
+      }));
+    }
   };
 
   const dayProgressPercentage = (currentDay / 75) * 100;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <LinearGradient
+      colors={['#667eea', '#764ba2', '#f093fb']}
+      locations={[0, 0.6, 1]}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.content}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.dayText}>Day {currentDay} / 75</Text>
-          <View style={styles.progressBar}>
-            <View 
-              style={[styles.progressFill, { width: `${dayProgressPercentage}%` }]} 
-            />
+        <Animated.View 
+          style={[
+            styles.header,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <View style={styles.dayContainer}>
+            <Text style={styles.dayText}>Day {currentDay}</Text>
+            <Text style={styles.daySubtext}>of 75</Text>
           </View>
-          <Text style={styles.streakText}>🔥 {currentStreak} day streak</Text>
-        </View>
+          
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <Animated.View 
+                style={[
+                  styles.progressFill, 
+                  { width: `${dayProgressPercentage}%` }
+                ]} 
+              />
+            </View>
+            <Text style={styles.progressText}>{Math.round(dayProgressPercentage)}% Complete</Text>
+          </View>
+          
+          <View style={styles.streakContainer}>
+            <Text style={styles.streakEmoji}>🔥</Text>
+            <Text style={styles.streakText}>{currentStreak} day streak</Text>
+          </View>
+        </Animated.View>
+
+        {/* 24-Hour Timer */}
+        <Animated.View 
+          style={[
+            styles.timerContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: timerPulse }]
+            }
+          ]}
+        >
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']}
+            style={styles.timerCard}
+          >
+            <Text style={styles.timerTitle}>⏰ Time Remaining Today</Text>
+            <View style={styles.timerDisplay}>
+              <View style={styles.timeUnit}>
+                <Text style={styles.timeNumber}>{timeRemaining.hours.toString().padStart(2, '0')}</Text>
+                <Text style={styles.timeLabel}>Hours</Text>
+              </View>
+              <Text style={styles.timeSeparator}>:</Text>
+              <View style={styles.timeUnit}>
+                <Text style={styles.timeNumber}>{timeRemaining.minutes.toString().padStart(2, '0')}</Text>
+                <Text style={styles.timeLabel}>Minutes</Text>
+              </View>
+              <Text style={styles.timeSeparator}>:</Text>
+              <View style={styles.timeUnit}>
+                <Text style={styles.timeNumber}>{timeRemaining.seconds.toString().padStart(2, '0')}</Text>
+                <Text style={styles.timeLabel}>Seconds</Text>
+              </View>
+            </View>
+            <Text style={styles.timerSubtext}>Complete your exercises anytime today!</Text>
+          </LinearGradient>
+        </Animated.View>
 
         {/* Today's Challenge */}
-        <View style={styles.challengeContainer}>
-          <Text style={styles.challengeTitle}>Today's Challenge</Text>
+        <Animated.View 
+          style={[
+            styles.challengeContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <Text style={styles.challengeTitle}>💪 Today's Challenge</Text>
           
-          {exercises.map((exercise) => (
-            <View key={exercise.type} style={styles.exerciseCard}>
-              <View style={styles.exerciseInfo}>
-                <Text style={styles.exerciseEmoji}>{exercise.emoji}</Text>
-                <View style={styles.exerciseDetails}>
-                  <Text style={styles.exerciseName}>{exercise.name}</Text>
-                  <Text style={styles.exerciseTarget}>
-                    {exercise.target} {exercise.unit}
-                  </Text>
-                </View>
-              </View>
-              
-              <TouchableOpacity
-                style={styles.startButton}
-                onPress={() => handleStartExercise(exercise.type)}
+          {exercises.map((exercise, index) => (
+            <Animated.View
+              key={exercise.type}
+              style={[
+                styles.exerciseCard,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }]
+                }
+              ]}
+            >
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']}
+                style={styles.exerciseCardGradient}
               >
-                <Text style={styles.startButtonText}>Start</Text>
-              </TouchableOpacity>
-            </View>
+                <View style={styles.exerciseInfo}>
+                  <View style={styles.exerciseEmojiContainer}>
+                    <Text style={styles.exerciseEmoji}>{exercise.emoji}</Text>
+                  </View>
+                  <View style={styles.exerciseDetails}>
+                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                    <Text style={styles.exerciseTarget}>
+                      {exercise.target} {exercise.unit}
+                    </Text>
+                    <View style={styles.progressIndicator}>
+                      <View style={[styles.progressDot, exercise.completed && styles.progressDotCompleted]} />
+                      <Text style={styles.progressText}>
+                        {exercise.completed ? 'Completed ✅' : 'Pending'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                
+                <TouchableOpacity
+                  style={[styles.startButton, exercise.completed && styles.completedButton]}
+                  onPress={() => handleStartExercise(exercise.type)}
+                >
+                  <LinearGradient
+                    colors={exercise.completed ? ['#4CAF50', '#45a049'] : ['rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0.1)']}
+                    style={styles.startButtonGradient}
+                  >
+                    <Text style={styles.startButtonText}>
+                      {exercise.completed ? '✓' : 'Start'}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </LinearGradient>
+            </Animated.View>
           ))}
-        </View>
+        </Animated.View>
 
         {/* Share Button */}
-        <TouchableOpacity style={styles.shareButton}>
-          <Text style={styles.shareButtonText}>📱 Share "Day {currentDay} / 75 done!"</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+        <Animated.View 
+          style={[
+            { opacity: fadeAnim, transform: [{ scale: pulseAnim }] }
+          ]}
+        >
+          <TouchableOpacity style={styles.shareButton}>
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0.1)']}
+              style={styles.shareButtonGradient}
+            >
+              <Text style={styles.shareButtonText}>🚀 Share Progress</Text>
+              <Text style={styles.shareButtonSubtext}>Day {currentDay} / 75 completed!</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+  },
+  safeArea: {
+    flex: 1,
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 30,
+  },
+  dayContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
   },
   dayText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 16,
+    fontSize: 48,
+    fontWeight: '900',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 6,
+    letterSpacing: 2,
+  },
+  daySubtext: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+    marginTop: -5,
+  },
+  progressContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   progressBar: {
     width: '100%',
-    height: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 6,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 4,
+    backgroundColor: '#FFD700',
+    borderRadius: 6,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+  },
+  streakContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  streakEmoji: {
+    fontSize: 24,
+    marginRight: 8,
   },
   streakText: {
     fontSize: 18,
-    color: '#666666',
+    color: '#ffffff',
+    fontWeight: '700',
   },
-  challengeContainer: {
-    marginBottom: 32,
+  timerContainer: {
+    marginBottom: 30,
   },
-  challengeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 24,
+  timerCard: {
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  timerTitle: {
+    fontSize: 18,
+    color: '#ffffff',
+    fontWeight: '700',
+    marginBottom: 20,
     textAlign: 'center',
   },
-  exerciseCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-    padding: 20,
+  timerDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 16,
+  },
+  timeUnit: {
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  timeNumber: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#FFD700',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  timeLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  timeSeparator: {
+    fontSize: 28,
+    color: '#ffffff',
+    fontWeight: '900',
+    marginHorizontal: 8,
+  },
+  timerSubtext: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  challengeContainer: {
+    marginBottom: 30,
+  },
+  challengeTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 20,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 1,
+  },
+  exerciseCard: {
+    marginBottom: 16,
+    borderRadius: 20,
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  exerciseCardGradient: {
+    borderRadius: 20,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   exerciseInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  exerciseEmoji: {
-    fontSize: 32,
+  exerciseEmojiContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
+  },
+  exerciseEmoji: {
+    fontSize: 28,
   },
   exerciseDetails: {
     flex: 1,
   },
   exerciseName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
     marginBottom: 4,
   },
   exerciseTarget: {
     fontSize: 16,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  progressIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    marginRight: 8,
+  },
+  progressDotCompleted: {
+    backgroundColor: '#4CAF50',
+  },
+  progressText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
   },
   startButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
+    borderRadius: 15,
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  completedButton: {
+    shadowColor: '#4CAF50',
+  },
+  startButtonGradient: {
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    minWidth: 70,
+    alignItems: 'center',
   },
   startButtonText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   shareButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 48,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#007AFF',
+    borderRadius: 25,
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  shareButtonGradient: {
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 25,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   shareButtonText: {
     color: '#ffffff',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  shareButtonSubtext: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

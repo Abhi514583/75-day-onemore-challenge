@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface ExerciseBaseline {
   pushups: number;
@@ -37,10 +38,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       name: 'Push-ups',
       emoji: '💪',
       description: 'Upper body strength exercise',
-      instruction: 'How many push-ups can you do comfortably?',
+      instruction: 'How many push-ups can you do comfortably? (Type any number!)',
       unit: 'reps',
       min: 1,
-      max: 100,
       defaultValue: 10,
     },
     {
@@ -48,10 +48,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       name: 'Squats',
       emoji: '🦵',
       description: 'Lower body strength exercise',
-      instruction: 'How many squats can you do comfortably?',
+      instruction: 'How many squats can you do comfortably? (Type any number!)',
       unit: 'reps',
       min: 1,
-      max: 100,
       defaultValue: 15,
     },
     {
@@ -59,10 +58,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       name: 'Sit-ups',
       emoji: '🏋️',
       description: 'Core strength exercise',
-      instruction: 'How many sit-ups can you do comfortably?',
+      instruction: 'How many sit-ups can you do comfortably? (Type any number!)',
       unit: 'reps',
       min: 1,
-      max: 100,
       defaultValue: 10,
     },
     {
@@ -70,10 +68,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       name: 'Planks',
       emoji: '⏱️',
       description: 'Core endurance exercise',
-      instruction: 'How long can you hold a plank comfortably?',
+      instruction: 'How long can you hold a plank comfortably? (Type any number!)',
       unit: 'seconds',
       min: 10,
-      max: 300,
       defaultValue: 30,
     },
   ];
@@ -81,8 +78,20 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const currentExercise = exercises[currentStep];
 
   const handleValueChange = (value: string) => {
-    const numValue = parseInt(value) || currentExercise.defaultValue;
-    const clampedValue = Math.max(currentExercise.min, Math.min(currentExercise.max, numValue));
+    // Allow empty string for better UX while typing
+    if (value === '') {
+      setBaselines(prev => ({
+        ...prev,
+        [currentExercise.key]: 0,
+      }));
+      return;
+    }
+    
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) return;
+    
+    // Allow much higher values - remove the max constraint for flexibility
+    const clampedValue = Math.max(currentExercise.min, numValue);
     
     setBaselines(prev => ({
       ...prev,
@@ -132,7 +141,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 
   const adjustValue = (delta: number) => {
     const currentValue = baselines[currentExercise.key];
-    const newValue = Math.max(currentExercise.min, Math.min(currentExercise.max, currentValue + delta));
+    // Allow much higher values, remove max constraint
+    const newValue = Math.max(currentExercise.min, currentValue + delta);
     
     setBaselines(prev => ({
       ...prev,
@@ -141,8 +151,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <LinearGradient
+      colors={['#667eea', '#764ba2']}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.content}>
         {/* Progress Indicator */}
         <View style={styles.progressContainer}>
           <Text style={styles.progressText}>
@@ -202,8 +216,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 {[
                   currentExercise.key === 'planks' ? 15 : 5,
                   currentExercise.defaultValue,
-                  currentExercise.key === 'planks' ? 60 : 20,
-                  currentExercise.key === 'planks' ? 90 : 30,
+                  currentExercise.key === 'planks' ? 60 : 25,
+                  currentExercise.key === 'planks' ? 120 : 50,
+                  currentExercise.key === 'planks' ? 180 : 100,
                 ].map((value) => (
                   <TouchableOpacity
                     key={value}
@@ -227,9 +242,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 
           {/* Tips */}
           <View style={styles.tipsContainer}>
-            <Text style={styles.tipsTitle}>💡 Tip:</Text>
+            <Text style={styles.tipsTitle}>💡 Pro Tip:</Text>
             <Text style={styles.tipsText}>
-              Choose a number you can do comfortably. Remember, you'll be adding +1 every day for 75 days!
+              You can type any number! Whether you're starting at 5 or 100, choose what feels right for your current fitness level. You'll add +1 every day for 75 days!
             </Text>
           </View>
         </View>
@@ -264,15 +279,18 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
             {currentStep === exercises.length - 1 ? 'Start Challenge!' : 'Next'}
           </Text>
         </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+  },
+  safeArea: {
+    flex: 1,
   },
   content: {
     flexGrow: 1,
@@ -284,27 +302,29 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 16,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     marginBottom: 12,
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#ffffff',
     borderRadius: 2,
   },
   exerciseCard: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   exerciseEmoji: {
     fontSize: 64,
@@ -313,20 +333,24 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#ffffff',
     marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   exerciseDescription: {
     fontSize: 16,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 24,
   },
   instruction: {
     fontSize: 18,
-    color: '#333333',
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 24,
+    fontWeight: '600',
   },
   inputSection: {
     width: '100%',
@@ -342,9 +366,11 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#007AFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   adjustButtonText: {
     fontSize: 24,
@@ -354,84 +380,107 @@ const styles = StyleSheet.create({
   valueDisplay: {
     alignItems: 'center',
     marginHorizontal: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: 140,
   },
   valueInput: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#ffffff',
     textAlign: 'center',
     minWidth: 100,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   unitText: {
     fontSize: 16,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
+    fontWeight: '600',
   },
   quickSelectContainer: {
     alignItems: 'center',
   },
   quickSelectLabel: {
     fontSize: 14,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.8)',
     marginBottom: 12,
+    fontWeight: '600',
   },
   quickSelectButtons: {
     flexDirection: 'row',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
   },
   quickSelectButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   quickSelectButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: 'rgba(255, 215, 0, 0.3)',
+    borderColor: '#FFD700',
   },
   quickSelectButtonText: {
     fontSize: 14,
-    color: '#666666',
-    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
   },
   quickSelectButtonTextActive: {
-    color: '#ffffff',
+    color: '#FFD700',
+    fontWeight: '700',
   },
   tipsContainer: {
-    backgroundColor: '#fff3cd',
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
     padding: 16,
     borderRadius: 12,
     marginTop: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
   },
   tipsTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#856404',
+    fontWeight: '700',
+    color: '#FFD700',
     marginBottom: 4,
   },
   tipsText: {
     fontSize: 14,
-    color: '#856404',
+    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 20,
+    fontWeight: '500',
   },
   previewContainer: {
-    backgroundColor: '#e8f5e8',
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
   },
   previewTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#2d5a2d',
+    fontWeight: '700',
+    color: '#4CAF50',
     marginBottom: 4,
   },
   previewText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2d5a2d',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   navigationContainer: {
     flexDirection: 'row',
@@ -442,25 +491,34 @@ const styles = StyleSheet.create({
   navButton: {
     flex: 1,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 15,
     alignItems: 'center',
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
   },
   backButton: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   nextButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: 'rgba(255, 215, 0, 0.3)',
+    borderWidth: 1,
+    borderColor: '#FFD700',
   },
   navButtonDisabled: {
     opacity: 0.5,
   },
   navButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#ffffff',
   },
   backButtonText: {
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
 });
 
