@@ -1,0 +1,61 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidVideoFile() {
+      return resource.contentType.matches('video/.*') &&
+             resource.size < 50 * 1024 * 1024; // 50MB limit
+    }
+    
+    function isDuelParticipant(duelId, userId) {
+      let duel = firestore.get(/databases/(default)/documents/duels/$(duelId));
+      return duel.data.host.uid == userId || 
+             (duel.data.guest != null && duel.data.guest.uid == userId);
+    }
+    
+    // Proof videos for duels
+    match /duels/{duelId}/{userId}/proof.mp4 {
+      allow read: if isAuthenticated() && 
+                     (userId == request.auth.uid || isDuelParticipant(duelId, request.auth.uid));
+      allow write: if isOwner(userId) && 
+                      isValidVideoFile() &&
+                      isDuelParticipant(duelId, userId);
+      allow delete: if isOwner(userId);
+    }
+    
+    // Thumbnails for proof videos
+    match /duels/{duelId}/{userId}/proof_thumb.jpg {
+      allow read: if isAuthenticated() && 
+                     (userId == request.auth.uid || isDuelParticipant(duelId, request.auth.uid));
+      allow write: if isOwner(userId) && 
+                      resource.contentType.matches('image/.*') &&
+                      resource.size < 5 * 1024 * 1024 && // 5MB limit
+                      isDuelParticipant(duelId, userId);
+      allow delete: if isOwner(userId);
+    }
+    
+    // User avatars
+    match /users/{userId}/avatar.{ext} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && 
+                      resource.contentType.matches('image/.*') &&
+                      resource.size < 2 * 1024 * 1024 && // 2MB limit
+                      ext.matches('(jpg|jpeg|png|webp)');
+      allow delete: if isOwner(userId);
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

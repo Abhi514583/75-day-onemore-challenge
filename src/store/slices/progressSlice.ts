@@ -8,7 +8,7 @@ export interface ExerciseStats {
 }
 
 export interface WeeklyStats {
-  week: number; // 1-11 (75 days = ~11 weeks)
+  week: number; // Progressive weeks (lifelong challenge)
   startDate: string;
   endDate: string;
   completedDays: number;

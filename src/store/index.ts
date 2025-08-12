@@ -1,22 +1,18 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { persistStore, persistReducer } from "redux-persist";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { combineReducers } from "@reduxjs/toolkit";
 
-import challengeReducer from "./slices/challengeSlice";
-import userReducer from "./slices/userSlice";
-import progressReducer from "./slices/progressSlice";
-
-const persistConfig = {
-  key: "root",
-  storage: AsyncStorage,
-  whitelist: ["challenge", "user", "progress"], // Only persist these reducers
-};
+import userSlice from "./slices/userSlice";
+import challengeSlice from "./slices/challengeSlice";
+import duelsSlice from "./slices/duelsSlice";
+import authSlice from "./slices/authSlice";
+import persistConfig from "../config/persist";
 
 const rootReducer = combineReducers({
-  challenge: challengeReducer,
-  user: userReducer,
-  progress: progressReducer,
+  user: userSlice,
+  challenge: challengeSlice,
+  duels: duelsSlice,
+  auth: authSlice,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -26,7 +22,14 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ["persist/PERSIST", "persist/REHYDRATE"],
+        ignoredActions: [
+          "persist/PERSIST",
+          "persist/REHYDRATE",
+          "persist/REGISTER",
+          "persist/PURGE",
+          "persist/FLUSH",
+          "persist/PAUSE",
+        ],
       },
     }),
 });

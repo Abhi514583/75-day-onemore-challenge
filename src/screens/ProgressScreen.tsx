@@ -69,8 +69,8 @@ const ProgressScreen: React.FC<ProgressScreenProps> = ({ onBack }) => {
     ]).start();
   }, []);
 
-  // Calculate progress data
-  const progressPercentage = (currentDay / 75) * 100;
+  // Calculate progress data - this is now a lifelong challenge
+  const progressPercentage = Math.min((currentDay / 100) * 100, 100);
   const completionRate =
     totalDaysCompleted > 0 ? (totalDaysCompleted / currentDay) * 100 : 0;
 
@@ -169,9 +169,9 @@ const ProgressScreen: React.FC<ProgressScreenProps> = ({ onBack }) => {
     {
       id: "final_boss",
       title: "Challenge Conqueror",
-      description: "Completed all 75 days!",
+      description: "Completed 100 days!",
       icon: "👑",
-      unlocked: currentDay >= 75,
+      unlocked: currentDay >= 100,
       color: "#E91E63",
     },
   ];
@@ -211,7 +211,7 @@ const ProgressScreen: React.FC<ProgressScreenProps> = ({ onBack }) => {
           </Text>
           <Text style={styles.progressLabel}>Complete</Text>
         </View>
-        <Text style={styles.dayCounter}>Day {currentDay} of 75</Text>
+        <Text style={styles.dayCounter}>Day {currentDay}</Text>
       </View>
 
       {/* Stats Grid */}

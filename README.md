@@ -1,10 +1,10 @@
-# 75-Day OneMore Challenge 🏋️‍♂️
+# OneMore Challenge 🏋️‍♂️
 
 A progressive fitness challenge app that transforms your fitness journey through the power of "just one more" rep each day.
 
 ## 🎯 Concept
 
-Start with your baseline exercises and add **just ONE MORE rep** every single day for 75 days. By the end, you'll be amazed at your transformation!
+Start with your baseline exercises and add **just ONE MORE rep** every single day. Build lasting habits and watch your transformation unfold!
 
 **Example Journey:**
 
@@ -12,7 +12,7 @@ Start with your baseline exercises and add **just ONE MORE rep** every single da
 - Day 2: 11 push-ups
 - Day 3: 12 push-ups
 - ...
-- Day 75: 84 push-ups! 🎉
+- Day 100: 109 push-ups! 🎉
 
 ## ✨ Features
 
@@ -20,10 +20,10 @@ Start with your baseline exercises and add **just ONE MORE rep** every single da
 
 - **Welcome Screen** - Beautiful animated introduction
 - **Onboarding Flow** - Step-by-step baseline setup for each exercise
-- **Dashboard** - Clean "Day X / 75" progress tracking
+- **Dashboard** - Clean daily progress tracking
 - **4 Core Exercises** - Push-ups, Squats, Sit-ups, Planks
 - **Progress Tracking** - Streak counter and daily targets
-- **Social Sharing** - Share your "Day X / 75 done!" progress
+- **Social Sharing** - Share your daily progress and milestones
 
 ### 📱 **App Flow**
 
@@ -94,7 +94,7 @@ npx expo start --android
 2. **Tap "Start Your Challenge"** - Begin the onboarding process
 3. **Set your baselines** - Choose starting numbers for each exercise
 4. **View your dashboard** - See today's targets and progress
-5. **Track your journey** - Complete 75 days of progressive challenges!
+5. **Track your journey** - Build lasting fitness habits with progressive challenges!
 
 ## 📊 Challenge Logic
 
@@ -115,7 +115,7 @@ The app calculates daily targets using this formula:
 - **Clean & Minimal** - Focus on the challenge, not complexity
 - **Consistent UI** - Same design language across all screens
 - **Smooth Animations** - Delightful user experience
-- **Progress-Focused** - Always show where you are in the 75-day journey
+- **Progress-Focused** - Track your daily improvements and milestones
 
 ## 🏆 Milestones
 
@@ -133,6 +133,6 @@ MIT License - Feel free to use this code for your own fitness apps.
 
 ---
 
-**Ready to transform your fitness? Start your 75-day journey today!** 💪
+**Ready to transform your fitness? Start your OneMore journey today!** 💪
 
 _"The best time to plant a tree was 20 years ago. The second best time is now."_

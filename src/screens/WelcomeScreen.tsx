@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+  ScrollView,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { COLORS } from "../config/colors";
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 interface WelcomeScreenProps {
   onStartChallenge?: () => void;
@@ -19,58 +21,35 @@ interface WelcomeScreenProps {
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartChallenge }) => {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Start entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1200,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 1000,
+        duration: 600,
         useNativeDriver: true,
       }),
     ]).start();
-
-    // Continuous floating animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -10,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
 
     // Pulse animation for button
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.05,
-          duration: 1500,
+          duration: 2000,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1500,
+          duration: 2000,
           useNativeDriver: true,
         }),
       ])
@@ -78,7 +57,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartChallenge }) => {
   }, []);
 
   const handleStartChallenge = () => {
-    console.log('Starting 75-Day Challenge!');
+    console.log("Starting OneMore Challenge!");
     if (onStartChallenge) {
       onStartChallenge();
     }
@@ -86,97 +65,94 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartChallenge }) => {
 
   return (
     <LinearGradient
-      colors={['#667eea', '#764ba2', '#f093fb']}
-      locations={[0, 0.6, 1]}
+      colors={COLORS.BACKGROUND.PRIMARY}
+      locations={[0, 0.5, 1]}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
-        {/* Floating background elements */}
-        <Animated.View style={[styles.floatingElement, styles.element1, { transform: [{ translateY: floatAnim }] }]} />
-        <Animated.View style={[styles.floatingElement, styles.element2, { transform: [{ translateY: floatAnim }] }]} />
-        <Animated.View style={[styles.floatingElement, styles.element3, { transform: [{ translateY: floatAnim }] }]} />
-        
-        <Animated.View 
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [
-                { translateY: slideAnim },
-                { scale: scaleAnim }
-              ]
-            }
-          ]}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-        <View style={styles.header}>
-          <Animated.View style={[styles.titleContainer, { transform: [{ translateY: floatAnim }] }]}>
-            <Text style={styles.title}>75-Day</Text>
-            <Text style={styles.titleAccent}>OneMore</Text>
-            <Text style={styles.title}>Challenge</Text>
-          </Animated.View>
-          <Text style={styles.subtitle}>
-            Transform your fitness with progressive daily challenges
-          </Text>
-          <View style={styles.badgeContainer}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>🏆 Premium Experience</Text>
-            </View>
-          </View>
-        </View>
-        
-        <View style={styles.challengeInfo}>
-          <View style={styles.infoItem}>
-            <Text style={styles.emoji}>🏋️</Text>
-            <Text style={styles.infoText}>Push-ups, Squats, Sit-ups, Planks</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.emoji}>📈</Text>
-            <Text style={styles.infoText}>Add +1 rep every day for 75 days</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.emoji}>📱</Text>
-            <Text style={styles.infoText}>AI-powered form tracking</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.emoji}>🏆</Text>
-            <Text style={styles.infoText}>Earn milestone badges</Text>
-          </View>
-        </View>
-
-        <View style={styles.progressConcept}>
-          <Text style={styles.conceptTitle}>The "One More" Concept</Text>
-          <Text style={styles.conceptText}>
-            Start with your baseline. Each day, do just ONE MORE rep. 
-            By day 75, you'll be amazed at your transformation!
-          </Text>
-          <View style={styles.exampleProgress}>
-            <Text style={styles.exampleText}>Day 1: 10 push-ups</Text>
-            <Text style={styles.exampleText}>Day 2: 11 push-ups</Text>
-            <Text style={styles.exampleText}>Day 3: 12 push-ups</Text>
-            <Text style={styles.exampleDots}>...</Text>
-            <Text style={styles.exampleText}>Day 75: 84 push-ups! 🎉</Text>
-          </View>
-        </View>
-
-        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <TouchableOpacity 
-            style={styles.startButton}
-            onPress={handleStartChallenge}
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
           >
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0.1)']}
-              style={styles.startButtonGradient}
-            >
-              <Text style={styles.startButtonText}>🚀 Start Your Challenge</Text>
-              <Text style={styles.startButtonSubtext}>Begin your transformation</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
+            {/* Header Section */}
+            <View style={styles.header}>
+              <Text style={styles.titleAccent}>OneMore</Text>
+              <Text style={styles.title}>Challenge</Text>
+              <Text style={styles.subtitle}>
+                Transform your fitness with progressive daily challenges
+              </Text>
+            </View>
 
-        <Text style={styles.footerText}>
-          Join thousands completing the 75-day journey
-        </Text>
-        </Animated.View>
+            {/* Key Features */}
+            <View style={styles.featuresSection}>
+              <View style={styles.featureItem}>
+                <Text style={styles.emoji}>🏋️</Text>
+                <Text style={styles.featureText}>4 Core Exercises Daily</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.emoji}>📈</Text>
+                <Text style={styles.featureText}>
+                  Progressive +1 Rep System
+                </Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.emoji}>🏆</Text>
+                <Text style={styles.featureText}>Achievement Tracking</Text>
+              </View>
+            </View>
+
+            {/* Progress Example */}
+            <View style={styles.progressExample}>
+              <Text style={styles.exampleTitle}>The "One More" Concept</Text>
+              <Text style={styles.exampleText}>
+                Start with your baseline. Add just ONE MORE rep each day.
+              </Text>
+              <View style={styles.progressDemo}>
+                <Text style={styles.demoText}>Day 1: 10 push-ups</Text>
+                <Text style={styles.demoText}>Day 2: 11 push-ups</Text>
+                <Text style={styles.demoText}>Day 100: 109 push-ups! 🎉</Text>
+              </View>
+            </View>
+
+            {/* Start Button */}
+            <Animated.View
+              style={[
+                styles.buttonContainer,
+                { transform: [{ scale: pulseAnim }] },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={handleStartChallenge}
+              >
+                <LinearGradient
+                  colors={[
+                    COLORS.UI.BUTTON_PRIMARY,
+                    COLORS.UI.BUTTON_SECONDARY,
+                  ]}
+                  style={styles.startButtonGradient}
+                >
+                  <Text style={styles.startButtonText}>🚀 Start Challenge</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Footer */}
+            <Text style={styles.footerText}>
+              Join thousands on their transformation journey
+            </Text>
+          </Animated.View>
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -189,143 +165,113 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  floatingElement: {
-    position: 'absolute',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 50,
-  },
-  element1: {
-    width: 100,
-    height: 100,
-    top: height * 0.1,
-    left: width * 0.1,
-  },
-  element2: {
-    width: 60,
-    height: 60,
-    top: height * 0.3,
-    right: width * 0.15,
-  },
-  element3: {
-    width: 80,
-    height: 80,
-    bottom: height * 0.2,
-    left: width * 0.2,
-  },
-  content: {
+  scrollView: {
     flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'space-between',
-    paddingTop: 60,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingBottom: 40,
   },
-  header: {
-    alignItems: 'center',
+  content: {
+    paddingHorizontal: 24,
+    paddingTop: 40,
   },
-  titleContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+  header: {
+    alignItems: "center",
+    marginBottom: 40,
   },
   title: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    fontSize: 32,
+    fontWeight: "800",
+    color: COLORS.TEXT.PRIMARY,
+    textAlign: "center",
+    textShadowColor: COLORS.EFFECTS.OVERLAY,
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
     letterSpacing: 1,
   },
   titleAccent: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: '#FFD700',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    fontSize: 38,
+    fontWeight: "900",
+    color: COLORS.ACCENT.PRIMARY,
+    textAlign: "center",
+    textShadowColor: COLORS.EFFECTS.OVERLAY,
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 6,
     letterSpacing: 2,
     marginVertical: -5,
   },
-  badgeContainer: {
-    marginTop: 10,
-  },
-  badge: {
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.5)',
-  },
-  badgeText: {
-    color: '#FFD700',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   subtitle: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  challengeInfo: {
-    marginVertical: 20,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+    fontSize: 16,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: "center",
+    lineHeight: 22,
+    marginTop: 16,
     paddingHorizontal: 20,
+  },
+  featuresSection: {
+    marginBottom: 40,
+  },
+  featureItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.BACKGROUND.CARD,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.BACKGROUND.CARD_BORDER,
   },
   emoji: {
     fontSize: 24,
     marginRight: 16,
     width: 32,
   },
-  infoText: {
+  featureText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: "500",
     flex: 1,
   },
-  progressConcept: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    padding: 20,
+  progressExample: {
+    backgroundColor: COLORS.BACKGROUND.CARD,
+    padding: 24,
     borderRadius: 16,
-    marginVertical: 20,
-    backdropFilter: 'blur(10px)',
+    marginBottom: 40,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.BACKGROUND.CARD_BORDER,
   },
-  conceptTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'center',
+  exampleTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.TEXT.PRIMARY,
+    textAlign: "center",
     marginBottom: 12,
-  },
-  conceptText: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  exampleProgress: {
-    alignItems: 'center',
   },
   exampleText: {
     fontSize: 14,
-    color: '#ffffff',
-    marginBottom: 4,
-    fontWeight: '500',
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 16,
   },
-  exampleDots: {
+  progressDemo: {
+    alignItems: "center",
+  },
+  demoText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginVertical: 4,
+    color: COLORS.TEXT.ACCENT,
+    marginBottom: 6,
+    fontWeight: "500",
+  },
+  buttonContainer: {
+    marginBottom: 30,
   },
   startButton: {
     borderRadius: 25,
-    shadowColor: 'rgba(0, 0, 0, 0.3)',
+    shadowColor: COLORS.UI.SHADOW,
     shadowOffset: {
       width: 0,
       height: 8,
@@ -336,28 +282,22 @@ const styles = StyleSheet.create({
   },
   startButtonGradient: {
     paddingHorizontal: 48,
-    paddingVertical: 20,
+    paddingVertical: 18,
     borderRadius: 25,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: COLORS.UI.BUTTON_BORDER,
   },
   startButtonText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  startButtonSubtext: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 14,
-    fontWeight: '500',
+    color: COLORS.TEXT.PRIMARY,
+    fontSize: 18,
+    fontWeight: "700",
   },
   footerText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    marginTop: 16,
+    color: COLORS.TEXT.MUTED,
+    textAlign: "center",
+    marginBottom: 20,
   },
 });
 

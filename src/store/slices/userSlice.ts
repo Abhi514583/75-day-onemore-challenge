@@ -29,6 +29,18 @@ export interface UserState {
   };
   achievements: string[]; // Achievement IDs
   totalChallengesCompleted: number;
+  xp: number;
+  level: number;
+  personalBests: {
+    pushups: number;
+    squats: number;
+    situps: number;
+    planks: number;
+    pushupsDate: string;
+    squatsDate: string;
+    situpsDate: string;
+    planksDate: string;
+  };
 }
 
 const initialState: UserState = {
@@ -56,6 +68,18 @@ const initialState: UserState = {
   },
   achievements: [],
   totalChallengesCompleted: 0,
+  xp: 0,
+  level: 1,
+  personalBests: {
+    pushups: 0,
+    squats: 0,
+    situps: 0,
+    planks: 0,
+    pushupsDate: "",
+    squatsDate: "",
+    situpsDate: "",
+    planksDate: "",
+  },
 };
 
 const userSlice = createSlice({
@@ -103,6 +127,37 @@ const userSlice = createSlice({
       state.totalChallengesCompleted += 1;
     },
 
+    updatePersonalBest: (
+      state,
+      action: PayloadAction<{
+        exercise: "pushups" | "squats" | "situps" | "planks";
+        value: number;
+      }>
+    ) => {
+      const { exercise, value } = action.payload;
+      if (value > state.personalBests[exercise]) {
+        state.personalBests[exercise] = value;
+        state.personalBests[
+          `${exercise}Date` as keyof typeof state.personalBests
+        ] = new Date().toISOString();
+        // Award XP for new PB
+        state.xp += 100;
+        // Level up if needed
+        const newLevel = Math.floor(state.xp / 1000) + 1;
+        if (newLevel > state.level) {
+          state.level = newLevel;
+        }
+      }
+    },
+
+    awardXP: (state, action: PayloadAction<number>) => {
+      state.xp += action.payload;
+      const newLevel = Math.floor(state.xp / 1000) + 1;
+      if (newLevel > state.level) {
+        state.level = newLevel;
+      }
+    },
+
     resetUserData: (state) => {
       return { ...initialState };
     },
@@ -116,6 +171,8 @@ export const {
   unlockPremium,
   addAchievement,
   completeChallengeAchievement,
+  updatePersonalBest,
+  awardXP,
   resetUserData,
 } = userSlice.actions;
 

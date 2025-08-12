@@ -1,4 +1,18 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import NotificationService from "../../services/NotificationService";
+import AchievementService from "../../services/AchievementService";
+import {
+  CHALLENGE_CONFIG,
+  isChallengeMilestone,
+  isChallengeComplete,
+} from "../../config/challenge";
+import {
+  getCurrentLocalDateString,
+  calculateCurrentChallengeDay,
+  isYesterday,
+  isChallengeCompleted,
+  logTimezoneInfo,
+} from "../../utils/dateUtils";
 
 export interface ExerciseBaseline {
   pushups: number;
@@ -9,7 +23,7 @@ export interface ExerciseBaseline {
 
 export interface DailyProgress {
   date: string; // YYYY-MM-DD format
-  day: number; // 1-75
+  day: number; // 1+ (no upper limit for lifelong challenge)
   exercises: {
     pushups: { target: number; completed: boolean; actualReps?: number };
     squats: { target: number; completed: boolean; actualReps?: number };
@@ -22,14 +36,16 @@ export interface DailyProgress {
 export interface ChallengeState {
   isActive: boolean;
   startDate: string | null; // YYYY-MM-DD format
-  currentDay: number; // 1-75
+  currentDay: number; // 1+ (no upper limit for lifelong challenge)
   baselines: ExerciseBaseline;
   currentStreak: number;
   bestStreak: number;
   totalDaysCompleted: number;
   dailyProgress: Record<string, DailyProgress>; // date -> progress
   lastCompletedDate: string | null;
-  challengeCompleted: boolean;
+  challengeCompleted: boolean; // Always false for lifelong challenge
+  freezeTokensRemaining: number;
+  lastFreezeTokenDate: string | null;
 }
 
 const initialState: ChallengeState = {
@@ -48,6 +64,8 @@ const initialState: ChallengeState = {
   dailyProgress: {},
   lastCompletedDate: null,
   challengeCompleted: false,
+  freezeTokensRemaining: 1,
+  lastFreezeTokenDate: null,
 };
 
 const challengeSlice = createSlice({
@@ -55,7 +73,11 @@ const challengeSlice = createSlice({
   initialState,
   reducers: {
     startChallenge: (state, action: PayloadAction<ExerciseBaseline>) => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getCurrentLocalDateString();
+
+      console.log("🚀 Starting challenge on:", today);
+      logTimezoneInfo();
+
       state.isActive = true;
       state.startDate = today;
       state.currentDay = 1;
@@ -82,8 +104,19 @@ const challengeSlice = createSlice({
         actualCount: number;
       }>
     ) => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getCurrentLocalDateString();
       const { exerciseType, actualCount } = action.payload;
+
+      // Sync current day first to ensure we're working with the correct day
+      if (state.startDate) {
+        const correctCurrentDay = calculateCurrentChallengeDay(state.startDate);
+        if (correctCurrentDay !== state.currentDay) {
+          console.log(
+            `📅 Syncing current day from ${state.currentDay} to ${correctCurrentDay}`
+          );
+          state.currentDay = correctCurrentDay;
+        }
+      }
 
       // Ensure today's progress exists
       if (!state.dailyProgress[today]) {
@@ -116,13 +149,9 @@ const challengeSlice = createSlice({
         state.lastCompletedDate = today;
         state.totalDaysCompleted += 1;
 
-        // Update streak
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split("T")[0];
-
+        // Update streak using timezone-safe yesterday check
         if (
-          state.lastCompletedDate === yesterdayStr ||
+          (state.lastCompletedDate && isYesterday(state.lastCompletedDate)) ||
           state.currentStreak === 0
         ) {
           state.currentStreak += 1;
@@ -135,24 +164,80 @@ const challengeSlice = createSlice({
           state.bestStreak = state.currentStreak;
         }
 
-        // Check if challenge is completed
-        if (state.currentDay >= 75) {
-          state.challengeCompleted = true;
+        // Trigger milestone notifications for significant days
+        if (isChallengeMilestone(state.currentDay)) {
+          NotificationService.scheduleMilestoneCelebration(state.currentDay);
+        }
+
+        // Check and unlock achievements
+        const todayExercises = {
+          pushups: todayProgress.exercises.pushups.actualReps,
+          squats: todayProgress.exercises.squats.actualReps,
+          situps: todayProgress.exercises.situps.actualReps,
+          planks: todayProgress.exercises.planks.actualSeconds,
+        };
+
+        AchievementService.checkAchievements({
+          currentDay: state.currentDay,
+          currentStreak: state.currentStreak,
+          bestStreak: state.bestStreak,
+          totalDaysCompleted: state.totalDaysCompleted,
+          lastWorkoutTime: new Date().toISOString(),
+          todayExercises,
+        });
+
+        // Special milestone celebrations
+        if (
+          state.currentDay === CHALLENGE_CONFIG.ACHIEVEMENTS.WARRIOR_THRESHOLD
+        ) {
+          NotificationService.scheduleAchievementUnlock({
+            title: "Fitness Warrior",
+            description: `Completed ${CHALLENGE_CONFIG.ACHIEVEMENTS.WARRIOR_THRESHOLD} days of the OneMore challenge!`,
+            icon: "🏆",
+          });
+        }
+
+        if (
+          state.currentDay === CHALLENGE_CONFIG.ACHIEVEMENTS.CHAMPION_THRESHOLD
+        ) {
+          NotificationService.scheduleAchievementUnlock({
+            title: "Challenge Champion",
+            description: `Completed ${CHALLENGE_CONFIG.ACHIEVEMENTS.CHAMPION_THRESHOLD} days of the OneMore challenge!`,
+            icon: "👑",
+          });
+        } else if (state.currentDay === 365) {
+          NotificationService.scheduleAchievementUnlock({
+            title: "One Year Strong",
+            description: "Completed a full year of the OneMore challenge!",
+            icon: "👑",
+          });
+        } else if (state.currentDay === 1000) {
+          NotificationService.scheduleAchievementUnlock({
+            title: "Legendary Dedication",
+            description: "Completed 1000 days of the OneMore challenge!",
+            icon: "🌟",
+          });
         }
       }
     },
 
     advanceDay: (state) => {
-      if (state.currentDay < 75) {
-        state.currentDay += 1;
-        const today = new Date().toISOString().split("T")[0];
+      // This action is now deprecated in favor of automatic day sync
+      // But kept for backward compatibility
+      console.warn("⚠️ advanceDay is deprecated. Use syncCurrentDay instead.");
 
-        // Initialize new day's progress
-        state.dailyProgress[today] = createDailyProgress(
-          today,
-          state.currentDay,
-          state.baselines
-        );
+      if (state.startDate) {
+        const correctCurrentDay = calculateCurrentChallengeDay(state.startDate);
+        state.currentDay = correctCurrentDay;
+
+        const today = getCurrentLocalDateString();
+        if (!state.dailyProgress[today]) {
+          state.dailyProgress[today] = createDailyProgress(
+            today,
+            state.currentDay,
+            state.baselines
+          );
+        }
       }
     },
 
@@ -164,8 +249,11 @@ const challengeSlice = createSlice({
       state.baselines = action.payload;
 
       // Recalculate current day's targets if challenge is active
-      if (state.isActive) {
-        const today = new Date().toISOString().split("T")[0];
+      if (state.isActive && state.startDate) {
+        // Sync current day first
+        state.currentDay = calculateCurrentChallengeDay(state.startDate);
+
+        const today = getCurrentLocalDateString();
         if (state.dailyProgress[today]) {
           state.dailyProgress[today] = createDailyProgress(
             today,
@@ -176,24 +264,82 @@ const challengeSlice = createSlice({
       }
     },
 
-    // Manual day sync for testing or corrections
+    useFreezeToken: (state) => {
+      if (state.freezeTokensRemaining > 0) {
+        state.freezeTokensRemaining -= 1;
+        state.lastFreezeTokenDate = new Date().toISOString();
+        // Preserve streak without completing exercises
+        const today = new Date().toISOString().split("T")[0];
+        state.lastCompletedDate = today;
+        console.log("❄️ Freeze token used. Streak preserved for today.");
+      }
+    },
+
+    // Timezone-safe day sync - handles DST and timezone changes
     syncCurrentDay: (state) => {
-      if (!state.startDate || !state.isActive) return;
+      if (!state.startDate || !state.isActive) {
+        console.log("⚠️ Cannot sync day: no start date or inactive challenge");
+        return;
+      }
 
-      const startDate = new Date(state.startDate);
-      const today = new Date();
-      const diffTime = today.getTime() - startDate.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      const oldCurrentDay = state.currentDay;
+      const newCurrentDay = calculateCurrentChallengeDay(state.startDate);
 
-      state.currentDay = Math.min(diffDays, 75);
+      console.log("📅 Syncing current day...");
+      console.log(`- Start date: ${state.startDate}`);
+      console.log(`- Old current day: ${oldCurrentDay}`);
+      console.log(`- New current day: ${newCurrentDay}`);
 
-      const todayStr = today.toISOString().split("T")[0];
-      if (!state.dailyProgress[todayStr]) {
-        state.dailyProgress[todayStr] = createDailyProgress(
-          todayStr,
+      logTimezoneInfo();
+
+      state.currentDay = newCurrentDay;
+
+      // Initialize today's progress if it doesn't exist
+      const today = getCurrentLocalDateString();
+      if (!state.dailyProgress[today]) {
+        console.log(
+          `📝 Creating progress entry for ${today} (day ${newCurrentDay})`
+        );
+        state.dailyProgress[today] = createDailyProgress(
+          today,
           state.currentDay,
           state.baselines
         );
+      }
+
+      // Lifelong challenge never completes - always stays active
+
+      if (oldCurrentDay !== newCurrentDay) {
+        console.log(`✅ Day synced from ${oldCurrentDay} to ${newCurrentDay}`);
+      } else {
+        console.log("✅ Day already in sync");
+      }
+    },
+
+    // Auto-sync current day (called on app focus/resume)
+    autoSyncCurrentDay: (state) => {
+      if (!state.startDate || !state.isActive) return;
+
+      const correctCurrentDay = calculateCurrentChallengeDay(state.startDate);
+
+      // Only log if there's a change to avoid spam
+      if (correctCurrentDay !== state.currentDay) {
+        console.log(
+          `🔄 Auto-syncing day from ${state.currentDay} to ${correctCurrentDay}`
+        );
+        state.currentDay = correctCurrentDay;
+
+        // Initialize today's progress if needed
+        const today = getCurrentLocalDateString();
+        if (!state.dailyProgress[today]) {
+          state.dailyProgress[today] = createDailyProgress(
+            today,
+            state.currentDay,
+            state.baselines
+          );
+        }
+
+        // Lifelong challenge never completes - always stays active
       }
     },
   },
@@ -236,7 +382,9 @@ export const {
   advanceDay,
   resetChallenge,
   updateBaselines,
+  useFreezeToken,
   syncCurrentDay,
+  autoSyncCurrentDay,
 } = challengeSlice.actions;
 
 export default challengeSlice.reducer;

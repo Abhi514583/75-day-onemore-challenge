@@ -1,0 +1,200 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidUser() {
+      return isAuthenticated() && 
+             request.auth.uid != null && 
+             request.auth.uid.size() > 0;
+    }
+    
+    function isValidTimestamp(timestamp) {
+      return timestamp is timestamp;
+    }
+    
+    function isValidExercise(exercise) {
+      return exercise in ['pushups', 'squats', 'situps', 'planks'];
+    }
+    
+    function isValidMode(mode) {
+      return mode in ['challenge', 'pb', 'duel'];
+    }
+    
+    function isValidSource(source) {
+      return source in ['manual', 'ai'];
+    }
+    
+    function isValidMatchType(matchType) {
+      return matchType in ['public', 'friend'];
+    }
+    
+    function isValidDuelStatus(status) {
+      return status in ['pending', 'active', 'completed', 'forfeit'];
+    }
+    
+    // Users collection - user profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && 
+                      isValidUserData(resource.data, request.resource.data);
+      
+      function isValidUserData(existingData, newData) {
+        return newData.keys().hasAll(['username', 'avatarUrl', 'omrRatings', 'xp', 'levels', 'baselines', 'freezeTokens', 'badges', 'fcmToken', 'createdAt', 'updatedAt']) &&
+               newData.username is string &&
+               newData.username.size() >= 3 &&
+               newData.username.size() <= 20 &&
+               newData.avatarUrl is string &&
+               newData.omrRatings.keys().hasAll(['pushups', 'squats', 'situps', 'planks']) &&
+               newData.omrRatings.pushups is number &&
+               newData.omrRatings.pushups >= 800 &&
+               newData.omrRatings.pushups <= 2000 &&
+               newData.xp is number &&
+               newData.xp >= 0 &&
+               newData.levels.keys().hasAll(['pushups', 'squats', 'situps', 'planks', 'global']) &&
+               newData.freezeTokens is number &&
+               newData.freezeTokens >= 0 &&
+               newData.badges is list &&
+               (newData.fcmToken == null || newData.fcmToken is string) &&
+               isValidTimestamp(newData.createdAt) &&
+               isValidTimestamp(newData.updatedAt);
+      }
+    }
+    
+    // Attempts collection - exercise attempts
+    match /attempts/{userId}/items/{attemptId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && 
+                       isValidAttemptData(request.resource.data);
+      allow update: if false; // Attempts are immutable once created
+      allow delete: if false; // Attempts cannot be deleted
+      
+      function isValidAttemptData(data) {
+        return data.keys().hasAll(['exercise', 'mode', 'score', 'sets', 'isPB', 'source', 'quality', 'clientAt', 'serverAt']) &&
+               isValidExercise(data.exercise) &&
+               isValidMode(data.mode) &&
+               data.score is number &&
+               data.score >= 0 &&
+               data.score <= 10000 &&
+               data.sets is list &&
+               data.isPB is bool &&
+               isValidSource(data.source) &&
+               (data.quality == null || (data.quality is number && data.quality >= 0 && data.quality <= 1)) &&
+               isValidTimestamp(data.clientAt) &&
+               isValidTimestamp(data.serverAt) &&
+               (!data.keys().hasAny(['notes']) || data.notes is string);
+      }
+    }
+    
+    // Duels collection - duel matches
+    match /duels/{duelId} {
+      allow read: if isAuthenticated() && 
+                     (resource.data.host.uid == request.auth.uid || 
+                      (resource.data.guest != null && resource.data.guest.uid == request.auth.uid));
+      allow create: if isAuthenticated() && 
+                       isValidDuelData(request.resource.data) &&
+                       request.resource.data.host.uid == request.auth.uid;
+      allow update: if isAuthenticated() && 
+                       (resource.data.host.uid == request.auth.uid || 
+                        (resource.data.guest != null && resource.data.guest.uid == request.auth.uid)) &&
+                       isValidDuelUpdate(resource.data, request.resource.data);
+      allow delete: if false; // Duels cannot be deleted
+      
+      function isValidDuelData(data) {
+        return data.keys().hasAll(['exercise', 'matchType', 'windowSec', 'host', 'guest', 'status', 'hostScore', 'guestScore', 'winnerUid', 'tieBreaker', 'seasonId', 'createdAt', 'activatedAt', 'completedAt']) &&
+               isValidExercise(data.exercise) &&
+               isValidMatchType(data.matchType) &&
+               data.windowSec in [600, 1800, 86400] &&
+               data.host.keys().hasAll(['uid', 'username']) &&
+               data.host.uid is string &&
+               data.host.username is string &&
+               (data.guest == null || (data.guest.keys().hasAll(['uid', 'username']) && data.guest.uid is string && data.guest.username is string)) &&
+               isValidDuelStatus(data.status) &&
+               (data.hostScore == null || (data.hostScore is number && data.hostScore >= 0)) &&
+               (data.guestScore == null || (data.guestScore is number && data.guestScore >= 0)) &&
+               (data.winnerUid == null || data.winnerUid is string) &&
+               (data.tieBreaker == null || data.tieBreaker in ['quality', 'speed', 'coin']) &&
+               data.seasonId is string &&
+               isValidTimestamp(data.createdAt);
+      }
+      
+      function isValidDuelUpdate(existingData, newData) {
+        // Only allow specific fields to be updated
+        return (
+          // Guest can join
+          (existingData.guest == null && newData.guest != null && newData.guest.uid == request.auth.uid) ||
+          // Host or guest can submit scores
+          (existingData.hostScore == null && newData.hostScore != null && existingData.host.uid == request.auth.uid) ||
+          (existingData.guestScore == null && newData.guestScore != null && existingData.guest != null && existingData.guest.uid == request.auth.uid) ||
+          // Status updates
+          (existingData.status != newData.status && isValidDuelStatus(newData.status))
+        );
+      }
+    }
+    
+    // Leaderboards collection - seasonal rankings
+    match /leaderboards/{exercise}/{seasonId}/rankings/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only server can update leaderboards
+    }
+    
+    // Personal Bests collection
+    match /pb/{userId}/{exercise} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && 
+                      isValidPBData(request.resource.data) &&
+                      isValidExercise(exercise);
+      
+      function isValidPBData(data) {
+        return data.keys().hasAll(['value', 'achievedAt', 'source']) &&
+               data.value is number &&
+               data.value >= 0 &&
+               data.value <= 10000 &&
+               isValidTimestamp(data.achievedAt) &&
+               (data.source in ['manual', 'ai', 'duel']);
+      }
+    }
+    
+    // Challenge Days collection
+    match /challengeDays/{userId}/{isoDate} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && 
+                      isValidChallengeDayData(request.resource.data);
+      
+      function isValidChallengeDayData(data) {
+        return data.keys().hasAll(['exercises', 'completedAt', 'lightened', 'earnedXP']) &&
+               data.exercises.keys().hasAll(['pushups', 'squats', 'situps', 'planks']) &&
+               data.exercises.pushups.keys().hasAll(['target', 'completed']) &&
+               data.exercises.pushups.target is number &&
+               data.exercises.pushups.target >= 0 &&
+               data.exercises.pushups.completed is number &&
+               data.exercises.pushups.completed >= 0 &&
+               (data.completedAt == null || isValidTimestamp(data.completedAt)) &&
+               data.lightened is bool &&
+               data.earnedXP is number &&
+               data.earnedXP >= 0;
+      }
+    }
+    
+    // Cloud Storage rules for proof videos
+    match /duels/{duelId}/{userId}/proof.mp4 {
+      allow read: if isAuthenticated() && 
+                     (userId == request.auth.uid || isDuelParticipant(duelId, request.auth.uid));
+      allow write: if isAuthenticated() && userId == request.auth.uid;
+      
+      function isDuelParticipant(duelId, userId) {
+        let duel = get(/databases/$(database)/documents/duels/$(duelId));
+        return duel.data.host.uid == userId || 
+               (duel.data.guest != null && duel.data.guest.uid == userId);
+      }
+    }
+  }
+}
