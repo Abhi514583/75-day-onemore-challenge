@@ -1,7 +1,31 @@
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
-import Constants from "expo-constants";
 import { Platform } from "react-native";
+
+// Graceful fallback for development builds without notifications
+let Notifications: any = null;
+let Device: any = null;
+let Constants: any = null;
+
+try {
+  Notifications = require("expo-notifications");
+  Device = require("expo-device");
+  Constants = require("expo-constants");
+} catch (error) {
+  console.warn("Notifications not available in this build:", error.message);
+  // Create mock objects to prevent crashes
+  Notifications = {
+    setNotificationHandler: () => {},
+    getPermissionsAsync: () => Promise.resolve({ status: "denied" }),
+    requestPermissionsAsync: () => Promise.resolve({ status: "denied" }),
+    scheduleNotificationAsync: () => Promise.resolve("mock-id"),
+    getAllScheduledNotificationsAsync: () => Promise.resolve([]),
+    cancelScheduledNotificationAsync: () => Promise.resolve(),
+    setNotificationChannelAsync: () => Promise.resolve(),
+    getExpoPushTokenAsync: () => Promise.resolve({ data: "mock-token" }),
+    AndroidImportance: { MAX: 5 },
+  };
+  Device = { isDevice: false };
+  Constants = { expoConfig: { extra: { eas: { projectId: "mock" } } } };
+}
 
 export interface NotificationSettings {
   dailyReminder: {

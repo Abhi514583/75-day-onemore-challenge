@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,17 +7,22 @@ import {
   TouchableOpacity,
   Animated,
   Alert,
+  Modal,
 } from "react-native";
 import { COLORS } from "../config/colors";
 import { SafeAreaWrapper } from "../components/SafeAreaWrapper";
 import { useAppSelector, useAppDispatch } from "../store/hooks";
 import { updatePreferences, resetUserData } from "../store/slices/userSlice";
 import { resetChallenge } from "../store/slices/challengeSlice";
+import { PoseDetectionTest } from "../components/PoseDetectionTest";
+import { CameraIntegrationTest } from "../components/CameraIntegrationTest";
 
 const SettingsTab: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const dispatch = useAppDispatch();
   const { preferences } = useAppSelector((state) => state.user);
+  const [showPoseTest, setShowPoseTest] = useState(false);
+  const [showCameraTest, setShowCameraTest] = useState(false);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -148,6 +153,29 @@ const SettingsTab: React.FC = () => {
             </View>
           </View>
 
+          {/* Development Tools (only in dev mode) */}
+          {__DEV__ && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🛠️ Development Tools</Text>
+
+              <TouchableOpacity
+                style={styles.devButton}
+                onPress={() => setShowPoseTest(true)}
+              >
+                <Text style={styles.devButtonText}>Test Pose Detection</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.devButton}
+                onPress={() => setShowCameraTest(true)}
+              >
+                <Text style={styles.devButtonText}>
+                  Test Camera Integration
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Danger Zone */}
           <View style={styles.section}>
             <Text style={styles.dangerTitle}>⚠️ Danger Zone</Text>
@@ -175,6 +203,44 @@ const SettingsTab: React.FC = () => {
           </View>
         </Animated.View>
       </ScrollView>
+
+      {/* Pose Detection Test Modal */}
+      <Modal
+        visible={showPoseTest}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowPoseTest(false)}
+            >
+              <Text style={styles.closeButtonText}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <PoseDetectionTest />
+        </View>
+      </Modal>
+
+      {/* Camera Integration Test Modal */}
+      <Modal
+        visible={showCameraTest}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowCameraTest(false)}
+            >
+              <Text style={styles.closeButtonText}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <CameraIntegrationTest />
+        </View>
+      </Modal>
     </SafeAreaWrapper>
   );
 };
@@ -307,6 +373,38 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.SECONDARY,
     textAlign: "center",
     lineHeight: 20,
+  },
+  devButton: {
+    backgroundColor: COLORS.UI.BUTTON_PRIMARY,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  devButtonText: {
+    color: COLORS.TEXT.PRIMARY,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY[0],
+  },
+  modalHeader: {
+    padding: 20,
+    paddingTop: 60,
+    alignItems: "flex-end",
+  },
+  closeButton: {
+    backgroundColor: COLORS.ACCENT.ERROR,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  closeButtonText: {
+    color: COLORS.TEXT.PRIMARY,
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
