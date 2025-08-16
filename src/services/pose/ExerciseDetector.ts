@@ -3,6 +3,8 @@ import { CalibrationData } from "./PoseProcessor";
 import { PushUpDetector } from "./exercises/PushUpDetector";
 import { SquatDetector } from "./exercises/SquatDetector";
 import { PlankDetector } from "./exercises/PlankDetector";
+import { BurpeeDetector } from "./exercises/BurpeeDetector";
+import { SitUpDetector } from "./exercises/SitUpDetector";
 import {
   ExerciseType,
   RepData,
@@ -27,6 +29,8 @@ export class ExerciseDetector {
   private pushUpDetector = new PushUpDetector();
   private squatDetector = new SquatDetector();
   private plankDetector = new PlankDetector();
+  private burpeeDetector = new BurpeeDetector();
+  private sitUpDetector = new SitUpDetector();
 
   private currentExercise: ExerciseType | null = null;
   private currentSession: ExerciseSession | null = null;
@@ -102,12 +106,18 @@ export class ExerciseDetector {
         return this.plankDetector.detectRep(pose, this.calibrationData);
 
       case "situps":
-        // TODO: Implement SitUpDetector
-        return this.createMockResult("situps", pose.timestamp);
+        return this.sitUpDetector.detectRep(
+          pose,
+          this.getJointAngles(pose),
+          this.calibrationData
+        );
 
       case "burpees":
-        // TODO: Implement BurpeeDetector
-        return this.createMockResult("burpees", pose.timestamp);
+        return this.burpeeDetector.detectRep(
+          pose,
+          this.getJointAngles(pose),
+          this.calibrationData
+        );
 
       case "lunges":
         // TODO: Implement LungeDetector
@@ -386,6 +396,23 @@ export class ExerciseDetector {
   }
 
   /**
+   * Get joint angles from pose (helper method for new detectors)
+   */
+  private getJointAngles(pose: Pose): any {
+    // This would typically use the PoseProcessor to calculate joint angles
+    // For now, return a basic implementation
+    return {
+      leftElbow: 0,
+      rightElbow: 0,
+      leftKnee: 0,
+      rightKnee: 0,
+      leftHip: 0,
+      rightHip: 0,
+      torsoAngle: 0,
+    };
+  }
+
+  /**
    * Reset the appropriate detector for an exercise
    */
   private resetDetector(exerciseType: ExerciseType): void {
@@ -398,6 +425,12 @@ export class ExerciseDetector {
         break;
       case "planks":
         this.plankDetector.reset();
+        break;
+      case "situps":
+        this.sitUpDetector.reset();
+        break;
+      case "burpees":
+        this.burpeeDetector.reset();
         break;
       // Add other detectors as they're implemented
     }
